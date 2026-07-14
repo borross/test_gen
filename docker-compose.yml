@@ -1,0 +1,22 @@
+# TestGen v2.2 — запуск через Docker Compose
+#
+#   docker compose up -d        # собрать и запустить
+#   docker compose logs -f      # логи
+#   docker compose down         # остановить и удалить
+#
+# Порт на хосте можно переопределить переменной окружения:
+#   TESTGEN_PORT=9000 docker compose up -d
+
+services:
+  testgen:
+    build: .
+    image: testgen:2.2
+    container_name: testgen
+    # Привязка к 127.0.0.1: интерфейс доступен только с этой машины.
+    # Чтобы открыть доступ из локальной сети, замените на "${TESTGEN_PORT:-8000}:8000".
+    ports:
+      - "127.0.0.1:${TESTGEN_PORT:-8000}:8000"
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true

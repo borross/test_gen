@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TestGen — генератор итоговых тестов по ИБ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── Токены (Revolut design system) ─────────────────────────────────── */
+:root{
+  --primary:#494fdf; --primary-deep:#3a40c4; --on-primary:#ffffff;
+  --ink:#191c1f; --body:#1f2226; --mute:#505a63; --stone:#8d969e; --faint:#c9c9cd;
+  --on-dark:#ffffff; --on-dark-mute:rgba(255,255,255,.72);
+  --canvas-light:#ffffff; --canvas-dark:#000000;
+  --surface-soft:#f4f4f4; --surface-card:#ffffff; --surface-elevated:#16181a;
+  --hairline-light:#e2e2e7; --hairline-dark:rgba(255,255,255,.12);
+  --hairline-strong:#191c1f; --divider-soft:rgba(255,255,255,.06);
+  --warning:#ec7e00; --danger:#e23b4a; --teal:#00a87e;
+  --r-sm:8px; --r-md:12px; --r-lg:20px; --r-full:9999px;
+  --display:'Aeonik Pro',Inter,system-ui,sans-serif;
+  --sans:Inter,system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+body{font-family:var(--sans);font-size:16px;line-height:1.5;letter-spacing:.24px;
+  color:var(--ink);background:var(--canvas-light)}
+button{font:inherit;cursor:pointer;border:none;background:none}
+input,select{font:inherit}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:4px}
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px}
+
+/* ── Навигация (nav-bar, canvas-dark, 64px) ─────────────────────────── */
+.nav{background:var(--canvas-dark);color:var(--on-dark);height:64px}
+.nav .wrap{height:64px;display:flex;align-items:center;justify-content:space-between}
+.wordmark{font-family:var(--display);font-weight:500;font-size:20px;color:var(--on-dark);
+  display:flex;align-items:center;gap:10px;letter-spacing:-.2px}
+.wordmark .dot{width:12px;height:12px;border-radius:var(--r-full);background:var(--primary)}
+.nav-note{font-size:13px;color:var(--on-dark-mute)}
+
+/* ── Hero (hero-band-dark) ──────────────────────────────────────────── */
+.hero{background:var(--canvas-dark);color:var(--on-dark);padding:88px 0 80px}
+.eyebrow{font-size:13px;line-height:1.4;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--on-dark-mute);margin-bottom:24px}
+h1{font-family:var(--display);font-weight:500;
+  font-size:clamp(48px,7vw,96px);line-height:1.0;letter-spacing:-.02em;max-width:14ch}
+.hero-sub{font-size:18px;line-height:1.56;letter-spacing:-.09px;
+  color:var(--on-dark-mute);max-width:52ch;margin-top:24px}
+
+/* Зона загрузки — surface-elevated, rounded-lg */
+.dropzone{margin-top:48px;background:var(--surface-elevated);border:1px dashed var(--hairline-dark);
+  border-radius:var(--r-lg);padding:48px 32px;display:flex;flex-direction:column;
+  align-items:center;gap:16px;text-align:center;transition:border-color .15s,background .15s}
+.dropzone.dragover{border-color:var(--on-dark);background:#1c1e21}
+.dropzone p{color:var(--on-dark-mute);font-size:14px;line-height:1.43}
+.dz-key{font-family:var(--display);font-weight:500;font-size:24px;line-height:1.33;color:var(--on-dark)}
+
+/* ── Кнопки (pill, 48px) ────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  height:48px;padding:14px 28px;border-radius:var(--r-full);
+  font-weight:600;font-size:16px;letter-spacing:.24px;transition:background .15s,opacity .15s}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:var(--canvas-light);color:var(--canvas-dark)}
+.btn-primary:not(:disabled):hover{background:var(--faint)}
+.btn-dark{background:var(--canvas-dark);color:var(--on-dark)}
+.btn-dark:not(:disabled):hover{background:var(--hairline-strong)}
+.btn-outline-dark{background:var(--canvas-dark);color:var(--on-dark);
+  border:1px solid var(--on-dark);padding:13px 27px}
+.btn-soft{background:var(--surface-soft);color:var(--ink)}
+.pill-sm{height:36px;padding:8px 16px;border-radius:var(--r-full);
+  background:var(--surface-soft);color:var(--ink);font-weight:600;font-size:14px;
+  transition:background .15s,color .15s}
+.pill-sm[aria-pressed="true"]{background:var(--canvas-dark);color:var(--on-dark)}
+.pill-sm .cnt{font-weight:400;color:inherit;opacity:.55;margin-left:4px}
+
+/* ── Секции ─────────────────────────────────────────────────────────── */
+.band-light{background:var(--canvas-light);color:var(--ink);padding:88px 0}
+.band-dark{background:var(--canvas-dark);color:var(--on-dark);padding:88px 0}
+h2{font-family:var(--display);font-weight:500;font-size:clamp(32px,4vw,48px);
+  line-height:1.21;letter-spacing:-.01em}
+.section-sub{color:var(--mute);margin-top:8px;max-width:60ch}
+.band-dark .section-sub{color:var(--on-dark-mute)}
+.hidden{display:none!important}
+
+/* ── Файлы базы ─────────────────────────────────────────────────────── */
+.file-list{margin-top:32px;display:flex;flex-direction:column;gap:8px}
+.file-row{background:var(--surface-soft);border-radius:var(--r-md);
+  padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.file-name{font-weight:600;flex:1;min-width:180px}
+.file-meta{font-size:13px;color:var(--mute)}
+.weight-wrap{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--mute)}
+.weight-input{width:72px;height:40px;border:1px solid var(--hairline-light);
+  border-radius:var(--r-sm);padding:0 10px;text-align:center;background:var(--canvas-light)}
+.remove-btn{width:36px;height:36px;border-radius:var(--r-full);background:var(--canvas-light);
+  border:1px solid var(--hairline-light);color:var(--mute);font-size:16px;line-height:1}
+.remove-btn:hover{color:var(--danger);border-color:var(--danger)}
+
+/* ── Статистика: карточки планов ────────────────────────────────────── */
+.stat-grid{margin-top:32px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.stat-card{background:var(--surface-card);border:1px solid var(--hairline-light);
+  border-radius:var(--r-lg);padding:32px}
+.stat-card .label{font-size:13px;color:var(--mute);line-height:1.4}
+.stat-card .value{font-family:var(--display);font-weight:500;font-size:40px;
+  line-height:1.2;letter-spacing:-.4px;margin-top:6px}
+/* Единственный кобальтовый штамп — featured-карточка */
+.stat-card.featured{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.stat-card.featured .label{color:rgba(255,255,255,.78)}
+.tests-detail{margin-top:24px;border:1px solid var(--hairline-light);
+  border-radius:var(--r-lg);overflow:hidden}
+.tests-detail table{width:100%;border-collapse:collapse;font-size:14px}
+.tests-detail th{background:var(--surface-soft);text-align:left;font-weight:600;
+  padding:12px 20px;color:var(--body)}
+.tests-detail td{padding:12px 20px;border-top:1px solid var(--hairline-light)}
+.tests-detail td.num{text-align:right;font-variant-numeric:tabular-nums;color:var(--mute)}
+.tests-detail td.num b{color:var(--ink)}
+
+/* ── Отчёт проверки ─────────────────────────────────────────────────── */
+.issues{margin-top:24px;display:flex;flex-direction:column;gap:8px}
+.issue{border-radius:var(--r-md);padding:12px 16px 12px 20px;font-size:14px;
+  background:var(--surface-soft);position:relative}
+.issue::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;
+  border-radius:var(--r-sm) 0 0 var(--r-sm)}
+.issue.error::before{background:var(--danger)}
+.issue.warning::before{background:var(--warning)}
+.issue .where{font-weight:600}
+.issues-ok{margin-top:24px;font-size:14px;color:var(--teal);font-weight:600}
+
+/* ── Форма параметров ───────────────────────────────────────────────── */
+.form-grid{margin-top:32px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px 16px}
+.field{display:flex;flex-direction:column;gap:8px}
+.field label{font-size:14px;font-weight:600;color:var(--body)}
+.field .hint{font-size:13px;color:var(--stone);font-weight:400}
+.text-input{height:56px;border:1px solid var(--hairline-light);border-radius:var(--r-md);
+  padding:14px 16px;background:var(--canvas-light);color:var(--ink);width:100%}
+.text-input:focus{border-color:var(--ink);outline:none}
+.field.span2{grid-column:span 2}
+.pill-row{display:flex;flex-wrap:wrap;gap:8px}
+.check-row{display:flex;align-items:center;gap:12px;margin-top:8px}
+.toggle{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;font-weight:600}
+.toggle input{position:absolute;opacity:0;width:0;height:0}
+.toggle .track{width:44px;height:26px;border-radius:var(--r-full);background:var(--faint);
+  position:relative;transition:background .15s;flex:none}
+.toggle .track::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;
+  border-radius:var(--r-full);background:var(--canvas-light);transition:transform .15s}
+.toggle input:checked + .track{background:var(--canvas-dark)}
+.toggle input:checked + .track::after{transform:translateX(18px)}
+.toggle input:focus-visible + .track{outline:2px solid var(--primary);outline-offset:2px}
+.form-actions{margin-top:40px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.form-error{color:var(--danger);font-size:14px;font-weight:600}
+
+/* ── Результат ──────────────────────────────────────────────────────── */
+.variant-tabs{margin-top:32px;display:flex;flex-wrap:wrap;gap:8px}
+.variant-tabs .pill-sm{background:var(--surface-elevated);color:var(--on-dark-mute)}
+.variant-tabs .pill-sm[aria-pressed="true"]{background:var(--canvas-light);color:var(--canvas-dark)}
+.result-meta{margin-top:24px;font-size:14px;color:var(--on-dark-mute);
+  display:flex;flex-wrap:wrap;gap:8px 24px}
+.result-meta b{color:var(--on-dark);font-weight:600}
+.preview{margin-top:24px;background:var(--surface-elevated);border-radius:var(--r-lg);
+  padding:32px;max-height:520px;overflow:auto}
+.preview pre{font-family:ui-monospace,'SF Mono',Consolas,monospace;font-size:13px;
+  line-height:1.6;color:var(--on-dark-mute);white-space:pre-wrap;word-break:break-word}
+.result-actions{margin-top:32px;display:flex;gap:16px;flex-wrap:wrap}
+
+/* ── Футер ──────────────────────────────────────────────────────────── */
+.footer{background:var(--canvas-dark);color:var(--on-dark-mute);
+  padding:80px 24px;font-size:14px}
+.footer .wrap{border-top:1px solid var(--divider-soft);padding-top:32px;
+  display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+
+/* ── Адаптив ────────────────────────────────────────────────────────── */
+@media (max-width:1023px){
+  .stat-grid,.form-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:767px){
+  .band-light,.band-dark{padding:64px 0}
+  .hero{padding:64px 0}
+  .stat-grid,.form-grid{grid-template-columns:1fr}
+  .field.span2{grid-column:span 1}
+  .pill-sm{height:44px;padding:10px 18px}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap">
+    <span class="wordmark"><span class="dot" aria-hidden="true"></span>TestGen</span>
+    <span class="nav-note">Локальный генератор · v2.2 · файлы не покидают ваш компьютер</span>
+  </div>
+</nav>
+
+<!-- ═══ HERO ═══ -->
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Основы информационной безопасности</p>
+    <h1>Итоговый тест. Собран за секунды.</h1>
+    <p class="hero-sub">Загрузите банки вопросов в markdown — TestGen проверит их,
+      распределит вопросы по темам, перемешает варианты ответов и соберёт
+      столько вариантов контрольной, сколько нужно вашим группам.</p>
+
+    <div class="dropzone" id="dropzone" role="button" tabindex="0"
+         aria-label="Загрузить markdown-файлы с тестами">
+      <span class="dz-key">Перетащите файлы .md сюда</span>
+      <p>Один файл может содержать несколько тестов — заголовки «#» разделят их автоматически</p>
+      <button class="btn btn-primary" id="pickBtn" type="button">Выбрать файлы</button>
+      <input type="file" id="fileInput" accept=".md,.markdown,.txt" multiple hidden>
+    </div>
+  </div>
+</header>
+
+<!-- ═══ БАЗА ВОПРОСОВ ═══ -->
+<section class="band-light hidden" id="baseSection">
+  <div class="wrap">
+    <h2>База вопросов</h2>
+    <p class="section-sub">Вес определяет долю вопросов из файла в итоговом тесте.
+      Если файл содержит несколько тестов, вес делится между ними поровну.</p>
+
+    <div class="file-list" id="fileList"></div>
+
+    <div class="stat-grid" id="statGrid"></div>
+    <div class="tests-detail hidden" id="testsDetail"></div>
+
+    <div id="issuesBox"></div>
+  </div>
+</section>
+
+<!-- ═══ ПАРАМЕТРЫ ═══ -->
+<section class="band-light hidden" id="paramsSection" style="padding-top:0">
+  <div class="wrap">
+    <h2>Параметры теста</h2>
+
+    <div class="form-grid">
+      <div class="field span2">
+        <label for="titleInput">Название теста</label>
+        <input class="text-input" id="titleInput" value="Итоговый тест по ИБ">
+      </div>
+      <div class="field">
+        <label for="totalInput">Вопросов в варианте</label>
+        <input class="text-input" id="totalInput" type="number" min="1" value="20">
+      </div>
+      <div class="field">
+        <label for="variantsInput">Вариантов</label>
+        <input class="text-input" id="variantsInput" type="number" min="1" max="20" value="1">
+      </div>
+
+      <div class="field span2">
+        <label id="typeLabel">Тип вопросов</label>
+        <div class="pill-row" id="typePills" role="group" aria-labelledby="typeLabel"></div>
+      </div>
+      <div class="field span2">
+        <label id="orderLabel">Порядок вопросов</label>
+        <div class="pill-row" role="group" aria-labelledby="orderLabel">
+          <button class="pill-sm" type="button" data-order="random" aria-pressed="true">Случайный</button>
+          <button class="pill-sm" type="button" data-order="grouped" aria-pressed="false">По темам</button>
+          <button class="pill-sm" type="button" data-order="source" aria-pressed="false">Как в источниках</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="seedInput">Seed <span class="hint">для воспроизводимости</span></label>
+        <input class="text-input" id="seedInput" type="number" placeholder="случайный">
+      </div>
+      <div class="field span2">
+        <span class="hint" style="height:22px"></span>
+        <div class="check-row">
+          <label class="toggle"><input type="checkbox" id="shuffleToggle" checked>
+            <span class="track" aria-hidden="true"></span>Перемешать варианты ответов</label>
+          <label class="toggle"><input type="checkbox" id="sourceToggle">
+            <span class="track" aria-hidden="true"></span>Показывать источники</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-dark" id="generateBtn" type="button">Сгенерировать тест</button>
+      <span class="form-error" id="formError" role="alert"></span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ РЕЗУЛЬТАТ ═══ -->
+<section class="band-dark hidden" id="resultSection">
+  <div class="wrap">
+    <h2>Готовый тест</h2>
+    <p class="section-sub" id="resultSeed"></p>
+
+    <div class="variant-tabs" id="variantTabs" role="tablist"></div>
+    <div class="result-meta" id="resultMeta"></div>
+
+    <div class="preview"><pre id="previewPre"></pre></div>
+
+    <div class="result-actions">
+      <button class="btn btn-primary" id="downloadBtn" type="button">Скачать вариант .md</button>
+      <button class="btn btn-outline-dark hidden" id="downloadAllBtn" type="button">Скачать все варианты</button>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="wrap">
+    <span>TestGen v2.2 — интерфейс к test_gen.py</span>
+    <span>Работает локально · без сторонних зависимостей</span>
+  </div>
+</footer>
+
+<script>
+'use strict';
+
+// ── Состояние ────────────────────────────────────────────────────────
+const state = {
+  files: [],            // [{name, content, weight}]
+  parse: null,          // ответ /api/parse
+  result: null,         // ответ /api/generate
+  activeVariant: 0,
+  type: 'mix',
+  order: 'random',
+};
+
+const $ = id => document.getElementById(id);
+const TYPE_LABELS = {
+  mix: 'Тестовые', basic: 'Базовые', normal: 'Обычные',
+  open: 'Открытые', all: 'Все вопросы',
+};
+
+// ── Загрузка файлов ──────────────────────────────────────────────────
+const dropzone = $('dropzone');
+$('pickBtn').addEventListener('click', () => $('fileInput').click());
+dropzone.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('fileInput').click(); }
+});
+$('fileInput').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+
+['dragover', 'dragenter'].forEach(ev => dropzone.addEventListener(ev, e => {
+  e.preventDefault(); dropzone.classList.add('dragover');
+}));
+['dragleave', 'drop'].forEach(ev => dropzone.addEventListener(ev, e => {
+  e.preventDefault(); dropzone.classList.remove('dragover');
+}));
+dropzone.addEventListener('drop', e => addFiles(e.dataTransfer.files));
+
+async function addFiles(fileList) {
+  for (const f of fileList) {
+    if (state.files.some(x => x.name === f.name)) continue;
+    const content = await f.text();
+    state.files.push({ name: f.name, content, weight: 1 });
+  }
+  await refreshParse();
+}
+
+function removeFile(name) {
+  state.files = state.files.filter(f => f.name !== name);
+  refreshParse();
+}
+
+// ── /api/parse — статистика и проверка базы ──────────────────────────
+async function refreshParse() {
+  if (state.files.length === 0) {
+    state.parse = null;
+    render();
+    return;
+  }
+  try {
+    const r = await fetch('/api/parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: state.files.map(f => ({ name: f.name, content: f.content })) }),
+    });
+    state.parse = await r.json();
+  } catch (e) {
+    state.parse = { error: 'Сервер недоступен: ' + e.message };
+  }
+  render();
+}
+
+// ── Отрисовка базы ───────────────────────────────────────────────────
+function render() {
+  const has = state.files.length > 0 && state.parse && !state.parse.error;
+  $('baseSection').classList.toggle('hidden', state.files.length === 0);
+  $('paramsSection').classList.toggle('hidden', !has);
+
+  // Список файлов с весами
+  $('fileList').innerHTML = '';
+  for (const f of state.files) {
+    const info = has ? state.parse.files.find(x => x.name === f.name) : null;
+    const row = document.createElement('div');
+    row.className = 'file-row';
+    row.innerHTML =
+      `<span class="file-name">${esc(f.name)}</span>` +
+      `<span class="file-meta">${info ? plural(info.tests.length, 'тест', 'теста', 'тестов')
+        + ' · ' + plural(info.total, 'вопрос', 'вопроса', 'вопросов') : '…'}</span>` +
+      `<span class="weight-wrap">вес
+        <input class="weight-input" type="number" min="0" step="1" value="${f.weight}"
+               aria-label="Вес файла ${esc(f.name)}"></span>` +
+      `<button class="remove-btn" type="button" aria-label="Убрать файл ${esc(f.name)}">✕</button>`;
+    row.querySelector('.weight-input').addEventListener('change', e => {
+      f.weight = Math.max(0, Number(e.target.value) || 0);
+    });
+    row.querySelector('.remove-btn').addEventListener('click', () => removeFile(f.name));
+    $('fileList').appendChild(row);
+  }
+
+  if (!has) {
+    $('statGrid').innerHTML = state.parse && state.parse.error
+      ? `<div class="issue error">${esc(state.parse.error)}</div>` : '';
+    $('testsDetail').classList.add('hidden');
+    $('issuesBox').innerHTML = '';
+    return;
+  }
+
+  // Карточки статистики; кобальт — только на featured «доступно»
+  const t = state.parse.totals;
+  const avail = state.parse.available[state.type];
+  $('statGrid').innerHTML =
+    statCard('Всего в базе', t.total) +
+    statCard('Базовых', t.basic) +
+    statCard('Обычных', t.normal) +
+    statCard('Открытых', t.open) +
+    `<div class="stat-card featured" style="grid-column:1/-1">
+       <div class="label">Доступно для генерации — «${TYPE_LABELS[state.type]}»</div>
+       <div class="value">${avail} ${pluralWord(avail, 'вопрос', 'вопроса', 'вопросов')}</div>
+     </div>`;
+
+  // Детализация по тестам
+  const rows = state.parse.files.flatMap(f => f.tests.map(ts =>
+    `<tr><td>${esc(ts.name)}</td><td class="num">${esc(f.name)}</td>
+     <td class="num"><b>${ts.total}</b></td><td class="num">${ts.basic}</td>
+     <td class="num">${ts.normal}</td><td class="num">${ts.open}</td></tr>`)).join('');
+  $('testsDetail').classList.remove('hidden');
+  $('testsDetail').innerHTML =
+    `<table><thead><tr><th>Тест</th><th style="text-align:right">Файл</th>
+     <th style="text-align:right">Всего</th><th style="text-align:right">Баз.</th>
+     <th style="text-align:right">Обыч.</th><th style="text-align:right">Откр.</th></tr></thead>
+     <tbody>${rows}</tbody></table>`;
+
+  // Отчёт проверки
+  const issues = state.parse.issues || [];
+  $('issuesBox').innerHTML = issues.length === 0
+    ? '<p class="issues-ok">✓ Проблем не найдено — база готова к генерации</p>'
+    : '<div class="issues">' + issues.map(i =>
+        `<div class="issue ${i.severity}">
+           <span class="where">${esc(i.file)} · ${esc(i.test)}:</span> ${esc(i.message)}
+         </div>`).join('') + '</div>';
+
+  renderTypePills();
+}
+
+function statCard(label, value) {
+  return `<div class="stat-card"><div class="label">${label}</div>
+          <div class="value">${value}</div></div>`;
+}
+
+// ── Пилюли типа и порядка ────────────────────────────────────────────
+function renderTypePills() {
+  const avail = state.parse ? state.parse.available : {};
+  $('typePills').innerHTML = '';
+  for (const key of ['mix', 'basic', 'normal', 'open', 'all']) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pill-sm';
+    b.setAttribute('aria-pressed', String(state.type === key));
+    b.innerHTML = `${TYPE_LABELS[key]}<span class="cnt">${avail[key] ?? 0}</span>`;
+    b.disabled = (avail[key] ?? 0) === 0;
+    b.addEventListener('click', () => { state.type = key; render(); });
+    $('typePills').appendChild(b);
+  }
+}
+
+document.querySelectorAll('[data-order]').forEach(b =>
+  b.addEventListener('click', () => {
+    state.order = b.dataset.order;
+    document.querySelectorAll('[data-order]').forEach(x =>
+      x.setAttribute('aria-pressed', String(x === b)));
+  }));
+
+// ── Генерация ────────────────────────────────────────────────────────
+$('generateBtn').addEventListener('click', async () => {
+  $('formError').textContent = '';
+  const btn = $('generateBtn');
+  btn.disabled = true; btn.textContent = 'Генерация…';
+  try {
+    const seedVal = $('seedInput').value.trim();
+    const r = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        files: state.files.map(f => ({ name: f.name, content: f.content })),
+        weights: state.files.map(f => f.weight),
+        total: Number($('totalInput').value),
+        variants: Number($('variantsInput').value),
+        type: state.type,
+        order: state.order,
+        shuffle: $('shuffleToggle').checked,
+        show_source: $('sourceToggle').checked,
+        seed: seedVal === '' ? null : Number(seedVal),
+        title: $('titleInput').value,
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Ошибка генерации');
+    state.result = data;
+    state.activeVariant = 0;
+    renderResult();
+    $('resultSection').scrollIntoView({ behavior: 'smooth' });
+  } catch (e) {
+    $('formError').textContent = e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Сгенерировать тест';
+  }
+});
+
+// ── Результат ────────────────────────────────────────────────────────
+function renderResult() {
+  const res = state.result;
+  $('resultSection').classList.remove('hidden');
+  $('resultSeed').textContent =
+    `Seed ${res.seed} — сохраните его, чтобы воспроизвести этот тест точь-в-точь.`;
+
+  $('variantTabs').innerHTML = '';
+  $('variantTabs').classList.toggle('hidden', res.variants.length === 1);
+  res.variants.forEach((v, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'pill-sm'; b.setAttribute('role', 'tab');
+    b.setAttribute('aria-pressed', String(i === state.activeVariant));
+    b.textContent = 'Вариант ' + v.variant;
+    b.addEventListener('click', () => { state.activeVariant = i; renderResult(); });
+    $('variantTabs').appendChild(b);
+  });
+
+  const v = res.variants[state.activeVariant];
+  const c = v.composition;
+  $('resultMeta').innerHTML =
+    `<span><b>${c.total}</b> ${pluralWord(c.total, 'вопрос', 'вопроса', 'вопросов')}</span>` +
+    `<span>базовых <b>${c.basic}</b></span><span>обычных <b>${c.normal}</b></span>` +
+    `<span>открытых <b>${c.open}</b></span>` +
+    `<span>темы: ${v.by_source.map(s => `${esc(s.source)} — <b>${s.count}</b>`).join(', ')}</span>`;
+  $('previewPre').textContent = v.markdown;
+
+  $('downloadAllBtn').classList.toggle('hidden', res.variants.length === 1);
+}
+
+$('downloadBtn').addEventListener('click', () => {
+  const v = state.result.variants[state.activeVariant];
+  downloadMd(v.filename, v.markdown);
+});
+$('downloadAllBtn').addEventListener('click', () => {
+  state.result.variants.forEach((v, i) =>
+    setTimeout(() => downloadMd(v.filename, v.markdown), i * 250));
+});
+
+function downloadMd(name, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown;charset=utf-8' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// ── Утилиты ──────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, m =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
+function pluralWord(n, one, few, many) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+}
+function plural(n, one, few, many) { return n + ' ' + pluralWord(n, one, few, many); }
+</script>
+</body>
+</html>
