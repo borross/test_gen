@@ -30,7 +30,7 @@ from typing import Optional
 
 from test_gen import (
     Issue, Question, filter_by_type, format_test, parse_block,
-    select_questions, split_into_blocks,
+    select_questions, select_questions_split, split_into_blocks,
 )
 
 APP_DIR = Path(__file__).resolve().parent
@@ -149,13 +149,27 @@ def api_generate(payload: dict) -> dict:
     if not files_payload:
         raise ValueError('Загрузите хотя бы один файл с тестами')
 
-    total = payload.get('total')
-    if not isinstance(total, int) or total <= 0:
-        raise ValueError('Количество вопросов должно быть положительным числом')
-
-    q_type = payload.get('type', 'mix')
-    if q_type not in VALID_TYPES:
-        raise ValueError(f'Неизвестный тип вопросов: {q_type}')
+    # Ручной состав: {"split": {"mc": N, "open": M}} — заменяет total и type
+    split = payload.get('split')
+    n_mc = n_open = 0
+    if split is not None:
+        try:
+            n_mc, n_open = int(split.get('mc', 0)), int(split.get('open', 0))
+        except (TypeError, ValueError):
+            raise ValueError('Состав: количества должны быть целыми числами')
+        if n_mc < 0 or n_open < 0:
+            raise ValueError('Состав: количества не могут быть отрицательными')
+        if n_mc + n_open == 0:
+            raise ValueError('Состав: укажите хотя бы один вопрос (тестовый или открытый)')
+        total = n_mc + n_open
+        q_type = 'all'
+    else:
+        total = payload.get('total')
+        if not isinstance(total, int) or total <= 0:
+            raise ValueError('Количество вопросов должно быть положительным числом')
+        q_type = payload.get('type', 'mix')
+        if q_type not in VALID_TYPES:
+            raise ValueError(f'Неизвестный тип вопросов: {q_type}')
 
     variants = payload.get('variants', 1)
     if not isinstance(variants, int) or not 1 <= variants <= MAX_VARIANTS:
@@ -190,8 +204,12 @@ def api_generate(payload: dict) -> dict:
     out_variants = []
     for v in range(1, variants + 1):
         rng = random.Random(f"{base_seed}:{v}")
-        selected = select_questions(all_sources, file_weights, file_test_counts,
-                                    total, q_type, rng)
+        if split is not None:
+            selected = select_questions_split(all_sources, file_weights,
+                                              file_test_counts, n_mc, n_open, rng)
+        else:
+            selected = select_questions(all_sources, file_weights, file_test_counts,
+                                        total, q_type, rng)
         if order == 'source':
             selected = sorted(selected, key=lambda q: (q.source_idx, q.number))
         elif order == 'grouped':
@@ -244,7 +262,7 @@ def api_pdf(payload: dict) -> tuple[bytes, str]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 class Handler(http.server.BaseHTTPRequestHandler):
-    server_version = 'TestGenWeb/2.4'
+    server_version = 'TestGenWeb/2.5'
 
     def _send(self, code: int, body: bytes, content_type: str) -> None:
         self.send_response(code)

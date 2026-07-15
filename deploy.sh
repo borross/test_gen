@@ -15,7 +15,7 @@
 
 set -euo pipefail
 
-IMAGE="testgen:2.4"
+IMAGE="testgen:2.5"
 CONTAINER="testgen"
 PORT="${TESTGEN_PORT:-8000}"
 BIND="${TESTGEN_BIND:-0.0.0.0}"   # 0.0.0.0 — доступ из сети; 127.0.0.1 — только эта машина

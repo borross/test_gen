@@ -486,6 +486,25 @@ def select_questions(all_sources: list[tuple[str, list[Question]]],
     return result
 
 
+def select_questions_split(all_sources: list[tuple[str, list[Question]]],
+                           file_weights: list[float], file_test_counts: list[int],
+                           n_mc: int, n_open: int,
+                           rng: random.Random) -> list[Question]:
+    """
+    Ручной состав теста: ровно n_mc тестовых вопросов (базовые + обычные)
+    и ровно n_open открытых. Веса файлов применяются к каждой части отдельно.
+    """
+    parts: list[Question] = []
+    if n_mc > 0:
+        parts.extend(select_questions(all_sources, file_weights, file_test_counts,
+                                      n_mc, 'mix', rng))
+    if n_open > 0:
+        parts.extend(select_questions(all_sources, file_weights, file_test_counts,
+                                      n_open, 'open', rng))
+    rng.shuffle(parts)
+    return parts
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Перемешивание вариантов ответов
 # ─────────────────────────────────────────────────────────────────────────────
@@ -590,7 +609,12 @@ def build_parser() -> argparse.ArgumentParser:
                    help='Веса для каждого файла (сумма не обязана = 100). '
                         'По умолчанию — равные.')
     p.add_argument('-n', '--total', type=int, metavar='N',
-                   help='Количество вопросов в тесте (обязателен без --info/--validate)')
+                   help='Количество вопросов в тесте (обязателен без --info/--validate, '
+                        'если не задан --split)')
+    p.add_argument('--split', nargs=2, type=int, metavar=('MC', 'OPEN'),
+                   help='Ручной состав: MC тестовых вопросов + OPEN открытых '
+                        '(например, --split 15 5 → тест из 20 вопросов). '
+                        'Заменяет -n и --type')
     p.add_argument('--type', choices=['basic', 'normal', 'mix', 'open', 'all'],
                    default='mix', dest='q_type', metavar='TYPE',
                    help='Тип вопросов: basic, normal, mix (по умол.), open, all')
@@ -678,8 +702,17 @@ def main() -> None:
     args = parser.parse_args()
 
     utility_mode = args.info or args.validate
-    if not utility_mode and args.total is None:
-        parser.error("укажите -n / --total, либо --info / --validate")
+    if args.split is not None:
+        if args.total is not None:
+            parser.error("--split и -n/--total взаимоисключающие: "
+                         "--split сам определяет общее количество вопросов")
+        mc, op = args.split
+        if mc < 0 or op < 0:
+            parser.error("--split: значения не могут быть отрицательными")
+        if mc + op == 0:
+            parser.error("--split: сумма тестовых и открытых должна быть больше нуля")
+    if not utility_mode and args.total is None and args.split is None:
+        parser.error("укажите -n / --total или --split, либо --info / --validate")
     if args.total is not None and args.total <= 0:
         parser.error("--total должен быть положительным числом")
     if args.variants < 1:
@@ -761,9 +794,13 @@ def main() -> None:
     base_seed = args.seed if args.seed is not None else random.randrange(10**9)
 
     print(f"\n⚙️  Параметры генерации:")
-    print(f"   Вопросов на вариант: {args.total}")
+    if args.split is not None:
+        print(f"   Состав варианта     : {args.split[0]} тестовых + "
+              f"{args.split[1]} открытых = {sum(args.split)} вопросов")
+    else:
+        print(f"   Вопросов на вариант: {args.total}")
+        print(f"   Тип                 : {args.q_type}")
     print(f"   Вариантов           : {args.variants}")
-    print(f"   Тип                 : {args.q_type}")
     print(f"   Перемешать ответы   : {'да' if args.shuffle else 'нет'}")
     print(f"   Порядок вопросов    : "
           f"{'как в источниках' if args.no_shuffle_questions else ('по темам' if args.group_by_source else 'случайный')}")
@@ -784,8 +821,13 @@ def main() -> None:
 
         print(f"\n🎲 Вариант {v}: выбор вопросов...")
         try:
-            selected = select_questions(all_sources, file_weights, file_test_counts,
-                                        args.total, args.q_type, rng)
+            if args.split is not None:
+                selected = select_questions_split(
+                    all_sources, file_weights, file_test_counts,
+                    args.split[0], args.split[1], rng)
+            else:
+                selected = select_questions(all_sources, file_weights, file_test_counts,
+                                            args.total, args.q_type, rng)
         except ValueError as e:
             print(f"\n❌ {e}", file=sys.stderr)
             sys.exit(1)

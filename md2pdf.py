@@ -107,7 +107,22 @@ th { background: #e7f3ee; color: #0b3d2e; }
 .callout p:last-child { margin-bottom: 0; }
 h2, h3 { page-break-after: avoid; }
 table, .callout { page-break-inside: avoid; }
+.page-break { page-break-before: always; }
 """
+
+# Заголовок блока ответов: "## ОТВЕТЫ — ...", "# ОТВЕТЫ" и т.п.
+ANSWERS_HEADING_RE = re.compile(r"^(#{1,3}\s*ОТВЕТЫ\b.*)$",
+                                re.IGNORECASE | re.MULTILINE)
+
+
+def break_before_answers(text):
+    """Вставляет разрыв страницы перед заголовком блока ответов.
+
+    При печати теста ответы всегда начинаются с новой страницы —
+    лист с ключом легко отделить от листов с вопросами.
+    """
+    return ANSWERS_HEADING_RE.sub(
+        r'<div class="page-break"></div>\n\n\1', text)
 
 
 def double_indent(s):
@@ -155,6 +170,7 @@ def md_to_pdf_bytes(text):
     """Конвертирует markdown-текст в PDF. Возвращает bytes."""
     text = double_indent(text)
     text = convert_callouts(text)
+    text = break_before_answers(text)
 
     body_html = markdown.markdown(
         text,

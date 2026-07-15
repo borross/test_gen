@@ -201,7 +201,7 @@ h2{font-family:var(--display);font-weight:500;font-size:clamp(32px,4vw,48px);
 <nav class="nav">
   <div class="wrap">
     <span class="wordmark"><span class="dot" aria-hidden="true"></span>TestGen</span>
-    <span class="nav-note">Локальный генератор · v2.4 · файлы не покидают ваш компьютер</span>
+    <span class="nav-note">Локальный генератор · v2.5 · файлы не покидают ваш компьютер</span>
   </div>
 </nav>
 
@@ -257,6 +257,22 @@ h2{font-family:var(--display);font-weight:500;font-size:clamp(32px,4vw,48px);
       <div class="field">
         <label for="variantsInput">Вариантов</label>
         <input class="text-input" id="variantsInput" type="number" min="1" max="20" value="1">
+      </div>
+
+      <div class="field span2">
+        <span class="hint" style="height:22px"></span>
+        <div class="check-row">
+          <label class="toggle"><input type="checkbox" id="splitToggle">
+            <span class="track" aria-hidden="true"></span>Задать состав: тестовые + открытые</label>
+        </div>
+      </div>
+      <div class="field hidden" id="mcField">
+        <label for="mcInput">Тестовых вопросов</label>
+        <input class="text-input" id="mcInput" type="number" min="0" value="15">
+      </div>
+      <div class="field hidden" id="openField">
+        <label for="openInput">Открытых вопросов</label>
+        <input class="text-input" id="openInput" type="number" min="0" value="5">
       </div>
 
       <div class="field span2">
@@ -324,7 +340,7 @@ h2{font-family:var(--display);font-weight:500;font-size:clamp(32px,4vw,48px);
 
 <footer class="footer">
   <div class="wrap">
-    <span>TestGen v2.4 — интерфейс к test_gen.py</span>
+    <span>TestGen v2.5 — интерфейс к test_gen.py</span>
     <span>Работает локально · без сторонних зависимостей</span>
   </div>
 </footer>
@@ -489,6 +505,7 @@ function renderTypePills() {
     b.addEventListener('click', () => { state.type = key; render(); });
     $('typePills').appendChild(b);
   }
+  syncSplit();
 }
 
 document.querySelectorAll('[data-order]').forEach(b =>
@@ -498,6 +515,30 @@ document.querySelectorAll('[data-order]').forEach(b =>
       x.setAttribute('aria-pressed', String(x === b)));
   }));
 
+// ── Ручной состав: тестовые + открытые ───────────────────────────────
+function splitMode() { return $('splitToggle').checked; }
+
+function syncSplit() {
+  const on = splitMode();
+  $('mcField').classList.toggle('hidden', !on);
+  $('openField').classList.toggle('hidden', !on);
+  $('totalInput').readOnly = on;
+  if (on) {
+    const sum = (Number($('mcInput').value) || 0) + (Number($('openInput').value) || 0);
+    $('totalInput').value = sum;   // «Вопросов в варианте» = тестовые + открытые
+  }
+  // Пилюли типа в этом режиме не участвуют — состав задан явно
+  $('typePills').querySelectorAll('button').forEach(b => {
+    b.disabled = on || (state.parse && (state.parse.available[typeKeyOf(b)] ?? 0) === 0);
+  });
+}
+function typeKeyOf(btn) {
+  return Object.keys(TYPE_LABELS).find(k => btn.textContent.startsWith(TYPE_LABELS[k]));
+}
+$('splitToggle').addEventListener('change', syncSplit);
+$('mcInput').addEventListener('input', syncSplit);
+$('openInput').addEventListener('input', syncSplit);
+
 // ── Генерация ────────────────────────────────────────────────────────
 $('generateBtn').addEventListener('click', async () => {
   $('formError').textContent = '';
@@ -505,21 +546,27 @@ $('generateBtn').addEventListener('click', async () => {
   btn.disabled = true; btn.textContent = 'Генерация…';
   try {
     const seedVal = $('seedInput').value.trim();
+    const body = {
+      files: state.files.map(f => ({ name: f.name, content: f.content })),
+      weights: state.files.map(f => f.weight),
+      variants: Number($('variantsInput').value),
+      order: state.order,
+      shuffle: $('shuffleToggle').checked,
+      show_source: $('sourceToggle').checked,
+      seed: seedVal === '' ? null : Number(seedVal),
+      title: $('titleInput').value,
+    };
+    if (splitMode()) {
+      body.split = { mc: Number($('mcInput').value) || 0,
+                     open: Number($('openInput').value) || 0 };
+    } else {
+      body.total = Number($('totalInput').value);
+      body.type = state.type;
+    }
     const r = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        files: state.files.map(f => ({ name: f.name, content: f.content })),
-        weights: state.files.map(f => f.weight),
-        total: Number($('totalInput').value),
-        variants: Number($('variantsInput').value),
-        type: state.type,
-        order: state.order,
-        shuffle: $('shuffleToggle').checked,
-        show_source: $('sourceToggle').checked,
-        seed: seedVal === '' ? null : Number(seedVal),
-        title: $('titleInput').value,
-      }),
+      body: JSON.stringify(body),
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'Ошибка генерации');

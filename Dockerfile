@@ -1,5 +1,5 @@
 # ══════════════════════════════════════════════════════════════════════
-#  TestGen v2.4 — образ веб-интерфейса генератора тестов
+#  TestGen v2.5 — образ веб-интерфейса генератора тестов
 #  Включает конвертер Markdown → PDF (weasyprint + шрифты DejaVu).
 # ══════════════════════════════════════════════════════════════════════
 
@@ -7,7 +7,7 @@ FROM python:3.12-slim
 
 LABEL org.opencontainers.image.title="TestGen" \
       org.opencontainers.image.description="Генератор итоговых тестов по ИБ — веб-интерфейс + PDF" \
-      org.opencontainers.image.version="2.4"
+      org.opencontainers.image.version="2.5"
 
 # Системные зависимости WeasyPrint и шрифты с кириллицей
 RUN apt-get update && apt-get install -y --no-install-recommends \
