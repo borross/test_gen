@@ -4,18 +4,18 @@
 #   docker compose logs -f      # логи
 #   docker compose down         # остановить и удалить
 #
-# Порт на хосте можно переопределить переменной окружения:
+# Порт и привязку можно переопределить переменными окружения:
 #   TESTGEN_PORT=9000 docker compose up -d
+#   TESTGEN_BIND=127.0.0.1 docker compose up -d   # доступ только с этой машины
 
 services:
   testgen:
     build: .
-    image: testgen:2.2
+    image: testgen:2.3
     container_name: testgen
-    # Привязка к 127.0.0.1: интерфейс доступен только с этой машины.
-    # Чтобы открыть доступ из локальной сети, замените на "${TESTGEN_PORT:-8000}:8000".
+    # По умолчанию доступен из вашей сети: http://<IP-машины>:8000
     ports:
-      - "127.0.0.1:${TESTGEN_PORT:-8000}:8000"
+      - "${TESTGEN_BIND:-0.0.0.0}:${TESTGEN_PORT:-8000}:8000"
     restart: unless-stopped
     read_only: true
     security_opt:

@@ -15,9 +15,10 @@
 
 set -euo pipefail
 
-IMAGE="testgen:2.2"
+IMAGE="testgen:2.3"
 CONTAINER="testgen"
 PORT="${TESTGEN_PORT:-8000}"
+BIND="${TESTGEN_BIND:-0.0.0.0}"   # 0.0.0.0 — доступ из сети; 127.0.0.1 — только эта машина
 CMD="${1:-up}"
 
 cd "$(dirname "$0")"
@@ -78,13 +79,13 @@ do_run() {
     echo "   Задайте другой: TESTGEN_PORT=9000 ./deploy.sh up" >&2
     exit 1
   fi
-  echo "🚀 Запуск контейнера ${CONTAINER} на порту ${PORT}..."
+  echo "🚀 Запуск контейнера ${CONTAINER}: ${BIND}:${PORT} → 8000..."
   docker run -d \
     --name "$CONTAINER" \
     --restart unless-stopped \
     --read-only \
     --security-opt no-new-privileges:true \
-    -p "127.0.0.1:${PORT}:8000" \
+    -p "${BIND}:${PORT}:8000" \
     "$IMAGE" >/dev/null
 
   # Ждём готовности (до 10 секунд)
@@ -99,7 +100,19 @@ do_run() {
   done
 
   echo
-  echo "✅ TestGen развёрнут: http://127.0.0.1:${PORT}"
+  echo "✅ TestGen развёрнут"
+  echo "   На этой машине:  http://127.0.0.1:${PORT}"
+  if [[ "$BIND" == "0.0.0.0" ]]; then
+    local lan_ip
+    lan_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+    [[ -z "$lan_ip" ]] && lan_ip="$(ipconfig getifaddr en0 2>/dev/null || true)"
+    if [[ -n "$lan_ip" ]]; then
+      echo "   Из вашей сети:   http://${lan_ip}:${PORT}"
+    else
+      echo "   Из вашей сети:   http://<IP-этой-машины>:${PORT}"
+    fi
+    echo "   Ограничить доступ только этой машиной: TESTGEN_BIND=127.0.0.1 ./deploy.sh up"
+  fi
   echo "   Логи:      ./deploy.sh logs"
   echo "   Остановка: ./deploy.sh down"
 }

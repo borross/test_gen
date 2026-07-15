@@ -14,9 +14,10 @@ rem ═════════════════════════�
 setlocal
 cd /d "%~dp0"
 
-set "IMAGE=testgen:2.2"
+set "IMAGE=testgen:2.3"
 set "CONTAINER=testgen"
 if "%TESTGEN_PORT%"=="" (set "PORT=8000") else (set "PORT=%TESTGEN_PORT%")
+if "%TESTGEN_BIND%"=="" (set "BIND=0.0.0.0") else (set "BIND=%TESTGEN_BIND%")
 set "CMD=%~1"
 if "%CMD%"=="" set "CMD=up"
 
@@ -48,12 +49,17 @@ for %%F in (Dockerfile test_gen.py web_app.py index.html) do (
 echo [*] Сборка образа %IMAGE%...
 docker build -t %IMAGE% . || exit /b 1
 docker rm -f %CONTAINER% >nul 2>nul
-echo [*] Запуск контейнера на порту %PORT%...
+echo [*] Запуск контейнера: %BIND%:%PORT% -^> 8000...
 docker run -d --name %CONTAINER% --restart unless-stopped --read-only ^
   --security-opt no-new-privileges:true ^
-  -p 127.0.0.1:%PORT%:8000 %IMAGE% >nul || exit /b 1
+  -p %BIND%:%PORT%:8000 %IMAGE% >nul || exit /b 1
 echo.
-echo [v] TestGen развёрнут: http://127.0.0.1:%PORT%
+echo [v] TestGen развёрнут
+echo     На этой машине:  http://127.0.0.1:%PORT%
+if "%BIND%"=="0.0.0.0" (
+  echo     Из вашей сети:   http://^<IP-этой-машины^>:%PORT%  ^(узнать IP: ipconfig^)
+  echo     Ограничить доступ: set TESTGEN_BIND=127.0.0.1 ^&^& deploy.bat up
+)
 echo     Логи:      deploy.bat logs
 echo     Остановка: deploy.bat down
 start "" http://127.0.0.1:%PORT%

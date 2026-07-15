@@ -211,7 +211,7 @@ ROUTES = {'/api/parse': api_parse, '/api/generate': api_generate}
 # ─────────────────────────────────────────────────────────────────────────────
 
 class Handler(http.server.BaseHTTPRequestHandler):
-    server_version = 'TestGenWeb/2.2'
+    server_version = 'TestGenWeb/2.3'
 
     def _send(self, code: int, body: bytes, content_type: str) -> None:
         self.send_response(code)

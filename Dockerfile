@@ -1,5 +1,5 @@
 # ══════════════════════════════════════════════════════════════════════
-#  TestGen v2.2 — образ веб-интерфейса генератора тестов
+#  TestGen v2.3 — образ веб-интерфейса генератора тестов
 #  Зависимостей нет: только стандартная библиотека Python.
 # ══════════════════════════════════════════════════════════════════════
 
@@ -7,7 +7,7 @@ FROM python:3.12-slim
 
 LABEL org.opencontainers.image.title="TestGen" \
       org.opencontainers.image.description="Генератор итоговых тестов по ИБ — веб-интерфейс" \
-      org.opencontainers.image.version="2.2"
+      org.opencontainers.image.version="2.3"
 
 # Непривилегированный пользователь
 RUN useradd --create-home --shell /usr/sbin/nologin testgen
