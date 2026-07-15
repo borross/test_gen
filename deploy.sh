@@ -15,7 +15,7 @@
 
 set -euo pipefail
 
-IMAGE="testgen:2.3"
+IMAGE="testgen:2.4"
 CONTAINER="testgen"
 PORT="${TESTGEN_PORT:-8000}"
 BIND="${TESTGEN_BIND:-0.0.0.0}"   # 0.0.0.0 — доступ из сети; 127.0.0.1 — только эта машина
@@ -37,7 +37,7 @@ require_docker() {
 
 require_files() {
   local missing=0
-  for f in Dockerfile test_gen.py web_app.py index.html; do
+  for f in Dockerfile requirements.txt test_gen.py web_app.py md2pdf.py index.html; do
     if [[ ! -f "$f" ]]; then
       echo "❌ Не найден файл: $f (запускайте скрипт из папки проекта)" >&2
       missing=1
@@ -84,6 +84,7 @@ do_run() {
     --name "$CONTAINER" \
     --restart unless-stopped \
     --read-only \
+    --tmpfs /tmp \
     --security-opt no-new-privileges:true \
     -p "${BIND}:${PORT}:8000" \
     "$IMAGE" >/dev/null

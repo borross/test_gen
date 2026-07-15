@@ -611,6 +611,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help='Название итогового теста')
     p.add_argument('--seed', type=int, default=None, metavar='N',
                    help='Seed генератора случайных чисел (для воспроизводимости)')
+    p.add_argument('--pdf', action='store_true',
+                   help='Дополнительно сохранить PDF-версию каждого варианта '
+                        '(требуются пакеты markdown и weasyprint, файл md2pdf.py)')
     p.add_argument('--show-source', action='store_true', dest='show_source',
                    help='Показывать источник под каждым вопросом')
     p.add_argument('--info', action='store_true',
@@ -794,6 +797,19 @@ def main() -> None:
         title = args.title + (f" — Вариант {v}" if args.variants > 1 else "")
         out_path.write_text(format_test(selected, title, args.shuffle, rng,
                                         args.show_source), encoding='utf-8')
+
+        if args.pdf:
+            try:
+                from md2pdf import md_to_pdf
+                pdf_path = out_path.with_suffix('.pdf')
+                md_to_pdf(str(out_path), str(pdf_path))
+                print(f"   📄 PDF сохранён: {pdf_path.resolve()}")
+            except ImportError as e:
+                print(f"  ⚠  PDF пропущен — не хватает зависимостей: {e}.\n"
+                      f"     Установите: pip install markdown weasyprint "
+                      f"(и держите md2pdf.py рядом со скриптом)", file=sys.stderr)
+            except Exception as e:  # noqa: BLE001
+                print(f"  ⚠  PDF пропущен — ошибка конвертации: {e}", file=sys.stderr)
 
         cnt_b = sum(1 for q in selected if q.is_basic)
         cnt_o = sum(1 for q in selected if q.is_open)

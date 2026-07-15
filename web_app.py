@@ -40,6 +40,20 @@ VALID_TYPES = {'mix', 'basic', 'normal', 'open', 'all'}
 VALID_ORDERS = {'random', 'grouped', 'source'}
 MAX_VARIANTS = 20
 
+_PDF_STATE: dict = {}
+
+
+def pdf_available() -> bool:
+    """True, если установлены зависимости конвертера PDF (markdown, weasyprint)."""
+    if 'ok' not in _PDF_STATE:
+        try:
+            import md2pdf  # noqa: F401 — проверяем и сам модуль, и его зависимости
+            _PDF_STATE['ok'] = True
+        except Exception as e:  # noqa: BLE001
+            _PDF_STATE['ok'] = False
+            _PDF_STATE['reason'] = str(e)
+    return _PDF_STATE['ok']
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Разбор контента, присланного из браузера (адаптер над test_gen)
@@ -126,6 +140,7 @@ def api_parse(payload: dict) -> dict:
     all_q = [q for _, qs in all_sources for q in qs]
     return {'files': per_file, 'totals': counts(all_q),
             'available': {t: len(filter_by_type(all_q, t)) for t in VALID_TYPES},
+            'pdf': pdf_available(),
             'issues': issues_json(issues)}
 
 
@@ -206,12 +221,30 @@ def api_generate(payload: dict) -> dict:
 ROUTES = {'/api/parse': api_parse, '/api/generate': api_generate}
 
 
+def api_pdf(payload: dict) -> tuple[bytes, str]:
+    """Конвертирует присланный markdown в PDF. Возвращает (bytes, имя файла)."""
+    if not pdf_available():
+        raise ValueError(
+            'Конвертер PDF недоступен: не установлены зависимости '
+            '(pip install markdown weasyprint). '
+            f'Детали: {_PDF_STATE.get("reason", "—")}')
+    md_text = str(payload.get('markdown', '')).strip()
+    if not md_text:
+        raise ValueError('Пустой markdown — нечего конвертировать')
+
+    from md2pdf import md_to_pdf_bytes
+    filename = str(payload.get('filename') or 'generated_test.pdf')
+    if not filename.lower().endswith('.pdf'):
+        filename += '.pdf'
+    return md_to_pdf_bytes(md_text), filename
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # HTTP-сервер
 # ─────────────────────────────────────────────────────────────────────────────
 
 class Handler(http.server.BaseHTTPRequestHandler):
-    server_version = 'TestGenWeb/2.3'
+    server_version = 'TestGenWeb/2.4'
 
     def _send(self, code: int, body: bytes, content_type: str) -> None:
         self.send_response(code)
@@ -236,13 +269,26 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._send(404, b'Not found', 'text/plain; charset=utf-8')
 
     def do_POST(self) -> None:  # noqa: N802
-        handler = ROUTES.get(self.path)
-        if handler is None:
-            self._send_json(404, {'error': 'Неизвестный путь API'})
-            return
         try:
             length = int(self.headers.get('Content-Length', 0))
             payload = json.loads(self.rfile.read(length).decode('utf-8') or '{}')
+
+            if self.path == '/api/pdf':
+                pdf_bytes, filename = api_pdf(payload)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/pdf')
+                self.send_header('Content-Length', str(len(pdf_bytes)))
+                self.send_header('Content-Disposition',
+                                 f'attachment; filename="{filename}"')
+                self.send_header('Cache-Control', 'no-store')
+                self.end_headers()
+                self.wfile.write(pdf_bytes)
+                return
+
+            handler = ROUTES.get(self.path)
+            if handler is None:
+                self._send_json(404, {'error': 'Неизвестный путь API'})
+                return
             self._send_json(200, handler(payload))
         except ValueError as e:
             self._send_json(400, {'error': str(e)})

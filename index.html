@@ -160,6 +160,17 @@ h2{font-family:var(--display);font-weight:500;font-size:clamp(32px,4vw,48px);
 .result-meta{margin-top:24px;font-size:14px;color:var(--on-dark-mute);
   display:flex;flex-wrap:wrap;gap:8px 24px}
 .result-meta b{color:var(--on-dark);font-weight:600}
+.themes-block{margin-top:16px;background:var(--surface-elevated);
+  border-radius:var(--r-lg);padding:24px 32px}
+.themes-block .themes-title{font-size:13px;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--on-dark-mute);margin-bottom:12px}
+.themes-block ul{list-style:none;display:flex;flex-direction:column;gap:6px}
+.themes-block li{font-size:14px;color:var(--on-dark-mute);display:flex;
+  justify-content:space-between;gap:16px;border-bottom:1px solid var(--divider-soft);
+  padding-bottom:6px}
+.themes-block li:last-child{border-bottom:none;padding-bottom:0}
+.themes-block li b{color:var(--on-dark);font-weight:600;white-space:nowrap}
+.result-error{color:var(--danger);font-size:14px;font-weight:600;align-self:center}
 .preview{margin-top:24px;background:var(--surface-elevated);border-radius:var(--r-lg);
   padding:32px;max-height:520px;overflow:auto}
 .preview pre{font-family:ui-monospace,'SF Mono',Consolas,monospace;font-size:13px;
@@ -190,7 +201,7 @@ h2{font-family:var(--display);font-weight:500;font-size:clamp(32px,4vw,48px);
 <nav class="nav">
   <div class="wrap">
     <span class="wordmark"><span class="dot" aria-hidden="true"></span>TestGen</span>
-    <span class="nav-note">Локальный генератор · v2.3 · файлы не покидают ваш компьютер</span>
+    <span class="nav-note">Локальный генератор · v2.4 · файлы не покидают ваш компьютер</span>
   </div>
 </nav>
 
@@ -291,19 +302,29 @@ h2{font-family:var(--display);font-weight:500;font-size:clamp(32px,4vw,48px);
 
     <div class="variant-tabs" id="variantTabs" role="tablist"></div>
     <div class="result-meta" id="resultMeta"></div>
+    <div class="themes-block" id="themesBlock">
+      <div class="themes-title">Темы в варианте</div>
+      <ul id="themesList"></ul>
+    </div>
 
     <div class="preview"><pre id="previewPre"></pre></div>
 
     <div class="result-actions">
       <button class="btn btn-primary" id="downloadBtn" type="button">Скачать вариант .md</button>
-      <button class="btn btn-outline-dark hidden" id="downloadAllBtn" type="button">Скачать все варианты</button>
+      <button class="btn btn-primary hidden" id="downloadPdfBtn" type="button">Скачать вариант .pdf</button>
+      <button class="btn btn-outline-dark hidden" id="downloadAllBtn" type="button">Скачать все .md</button>
+      <button class="btn btn-outline-dark hidden" id="downloadAllPdfBtn" type="button">Скачать все .pdf</button>
+      <span class="result-error" id="resultError" role="alert"></span>
     </div>
+    <p class="section-sub hidden" id="pdfHint" style="margin-top:16px;font-size:13px">
+      Экспорт в PDF недоступен: на сервере не установлены пакеты
+      <code>markdown</code> и <code>weasyprint</code>. В Docker-версии всё уже включено.</p>
   </div>
 </section>
 
 <footer class="footer">
   <div class="wrap">
-    <span>TestGen v2.3 — интерфейс к test_gen.py</span>
+    <span>TestGen v2.4 — интерфейс к test_gen.py</span>
     <span>Работает локально · без сторонних зависимостей</span>
   </div>
 </footer>
@@ -514,6 +535,16 @@ $('generateBtn').addEventListener('click', async () => {
 });
 
 // ── Результат ────────────────────────────────────────────────────────
+// Сортировка тем: с ведущим номером — по возрастанию номера, затем остальные по алфавиту
+function sortThemes(list) {
+  const num = s => {
+    const m = String(s).match(/^\s*(\d+)/);
+    return m ? Number(m[1]) : Infinity;
+  };
+  return [...list].sort((a, b) =>
+    num(a.source) - num(b.source) || a.source.localeCompare(b.source, 'ru'));
+}
+
 function renderResult() {
   const res = state.result;
   $('resultSection').classList.remove('hidden');
@@ -536,11 +567,22 @@ function renderResult() {
   $('resultMeta').innerHTML =
     `<span><b>${c.total}</b> ${pluralWord(c.total, 'вопрос', 'вопроса', 'вопросов')}</span>` +
     `<span>базовых <b>${c.basic}</b></span><span>обычных <b>${c.normal}</b></span>` +
-    `<span>открытых <b>${c.open}</b></span>` +
-    `<span>темы: ${v.by_source.map(s => `${esc(s.source)} — <b>${s.count}</b>`).join(', ')}</span>`;
+    `<span>открытых <b>${c.open}</b></span>`;
+
+  // Темы — каждая с новой строки, в порядке возрастания номеров
+  $('themesList').innerHTML = sortThemes(v.by_source).map(s =>
+    `<li><span>${esc(s.source)}</span>
+     <b>${plural(s.count, 'вопрос', 'вопроса', 'вопросов')}</b></li>`).join('');
+
   $('previewPre').textContent = v.markdown;
 
-  $('downloadAllBtn').classList.toggle('hidden', res.variants.length === 1);
+  const many = res.variants.length > 1;
+  const pdfOk = state.parse && state.parse.pdf;
+  $('downloadAllBtn').classList.toggle('hidden', !many);
+  $('downloadPdfBtn').classList.toggle('hidden', !pdfOk);
+  $('downloadAllPdfBtn').classList.toggle('hidden', !many || !pdfOk);
+  $('pdfHint').classList.toggle('hidden', !!pdfOk);
+  $('resultError').textContent = '';
 }
 
 $('downloadBtn').addEventListener('click', () => {
@@ -551,6 +593,50 @@ $('downloadAllBtn').addEventListener('click', () => {
   state.result.variants.forEach((v, i) =>
     setTimeout(() => downloadMd(v.filename, v.markdown), i * 250));
 });
+
+// ── PDF ──────────────────────────────────────────────────────────────
+async function fetchPdf(v) {
+  const r = await fetch('/api/pdf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ markdown: v.markdown,
+                           filename: v.filename.replace(/\.md$/i, '.pdf') }),
+  });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || 'Ошибка конвертации в PDF');
+  }
+  return r.blob();
+}
+
+function downloadBlob(name, blob) {
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function withBusy(btn, label, fn) {
+  const old = btn.textContent;
+  btn.disabled = true; btn.textContent = label;
+  $('resultError').textContent = '';
+  try { await fn(); }
+  catch (e) { $('resultError').textContent = e.message; }
+  finally { btn.disabled = false; btn.textContent = old; }
+}
+
+$('downloadPdfBtn').addEventListener('click', () =>
+  withBusy($('downloadPdfBtn'), 'Конвертация…', async () => {
+    const v = state.result.variants[state.activeVariant];
+    downloadBlob(v.filename.replace(/\.md$/i, '.pdf'), await fetchPdf(v));
+  }));
+
+$('downloadAllPdfBtn').addEventListener('click', () =>
+  withBusy($('downloadAllPdfBtn'), 'Конвертация…', async () => {
+    for (const v of state.result.variants) {
+      downloadBlob(v.filename.replace(/\.md$/i, '.pdf'), await fetchPdf(v));
+    }
+  }));
 
 function downloadMd(name, text) {
   const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown;charset=utf-8' }));

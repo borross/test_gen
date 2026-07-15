@@ -11,12 +11,14 @@
 services:
   testgen:
     build: .
-    image: testgen:2.3
+    image: testgen:2.4
     container_name: testgen
     # По умолчанию доступен из вашей сети: http://<IP-машины>:8000
     ports:
       - "${TESTGEN_BIND:-0.0.0.0}:${TESTGEN_PORT:-8000}:8000"
     restart: unless-stopped
     read_only: true
+    tmpfs:
+      - /tmp
     security_opt:
       - no-new-privileges:true
