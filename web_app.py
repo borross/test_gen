@@ -262,7 +262,7 @@ def api_pdf(payload: dict) -> tuple[bytes, str]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 class Handler(http.server.BaseHTTPRequestHandler):
-    server_version = 'TestGenWeb/2.5'
+    server_version = 'TestGenWeb/2.6'
 
     def _send(self, code: int, body: bytes, content_type: str) -> None:
         self.send_response(code)

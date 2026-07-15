@@ -6,6 +6,7 @@
 """
 
 import random
+import re
 
 from test_gen import (
     Question, distribute, filter_by_type, norm_letter, parse_block,
@@ -264,6 +265,24 @@ def test_filter_by_type():
     assert [q.number for q in filter_by_type(qs, 'mix')] == [1, 2]
     assert [q.number for q in filter_by_type(qs, 'open')] == [3]
     assert [q.number for q in filter_by_type(qs, 'all')] == [1, 2, 3]
+
+
+# ── Форматирование: открытые вопросы после тестовых ────────────────────────
+
+def test_format_open_questions_last():
+    from test_gen import format_test
+    qs = [
+        Question(1, 'откр1', [], '', 'ответ1', False, True, 'T', 'f'),
+        Question(2, 'тест1', [('A', 'x'), ('B', 'y')], 'A', '', False, False, 'T', 'f'),
+        Question(3, 'откр2', [], '', 'ответ2', False, True, 'T', 'f'),
+        Question(4, 'тест2', [('A', 'x'), ('B', 'y')], 'B', '', True, False, 'T', 'f'),
+    ]
+    md = format_test(qs, 'Т', False, random.Random(0))
+    order = [m for m in re.findall(r'^### \d+\. (\S+)', md, re.M)]
+    assert order == ['тест1', 'тест2', 'откр1', 'откр2'], order
+    # и нумерация в ключе соответствует: тестовые 1-2, открытые 3-4
+    assert '1-A, 2-B' in md
+    assert '**3.** ответ1' in md and '**4.** ответ2' in md
 
 
 def test_norm_letter():

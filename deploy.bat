@@ -14,7 +14,7 @@ rem ═════════════════════════�
 setlocal
 cd /d "%~dp0"
 
-set "IMAGE=testgen:2.5"
+set "IMAGE=testgen:2.6"
 set "CONTAINER=testgen"
 if "%TESTGEN_PORT%"=="" (set "PORT=8000") else (set "PORT=%TESTGEN_PORT%")
 if "%TESTGEN_BIND%"=="" (set "BIND=0.0.0.0") else (set "BIND=%TESTGEN_BIND%")

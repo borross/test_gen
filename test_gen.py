@@ -528,6 +528,11 @@ def shuffle_options(q: Question, rng: random.Random) -> tuple[list[tuple[str, st
 
 def format_test(questions: list[Question], title: str, shuffle_ans: bool,
                 rng: random.Random, show_source: bool = False) -> str:
+    # Открытые вопросы всегда идут после всех тестовых
+    # (внутри каждой группы порядок сохраняется)
+    questions = ([q for q in questions if not q.is_open]
+                 + [q for q in questions if q.is_open])
+
     has_mc = any(not q.is_open for q in questions)
     has_open = any(q.is_open for q in questions)
 

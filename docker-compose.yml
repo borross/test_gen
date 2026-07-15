@@ -11,7 +11,7 @@
 services:
   testgen:
     build: .
-    image: testgen:2.5
+    image: testgen:2.6
     container_name: testgen
     # По умолчанию доступен из вашей сети: http://<IP-машины>:8000
     ports:
